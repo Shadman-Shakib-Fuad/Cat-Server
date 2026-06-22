@@ -17,8 +17,6 @@ connectDB();
 
 const app = express();
 
-app.all("/api/auth/*", toNodeHandler(auth));
-
 app.use(
   cors({
     origin: process.env.CLIENT_URL,
@@ -28,6 +26,12 @@ app.use(
 
 app.use("/api/payment/webhook", express.raw({ type: "application/json" }));
 app.use(express.json());
+
+const authHandler = toNodeHandler(auth);
+app.use("/api/auth", (req, res) => {
+  req.url = req.url === "" ? "/" : req.url;
+  authHandler(req, res);
+});
 
 app.get("/", (req, res) => res.json({ message: "Digital Life Lessons API running" }));
 

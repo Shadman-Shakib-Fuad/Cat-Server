@@ -1,9 +1,10 @@
+import jwt from "jsonwebtoken";
 import { betterAuth } from "better-auth";
-import { mongooseAdapter } from "better-auth/adapters/mongoose";
-import mongoose from "mongoose";
 
 export const auth = betterAuth({
-  database: mongooseAdapter(mongoose.connection),
+  secret: process.env.BETTER_AUTH_SECRET,
+  baseURL: process.env.BETTER_AUTH_URL,
+  trustedOrigins: [process.env.CLIENT_URL],
   emailAndPassword: { enabled: true },
   socialProviders: {
     google: {
@@ -11,22 +12,17 @@ export const auth = betterAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     },
   },
-  secret: process.env.BETTER_AUTH_SECRET,
-  baseURL: process.env.BETTER_AUTH_URL,
-  trustedOrigins: [process.env.CLIENT_URL],
 });
 
 export const verifyToken = async (req, res, next) => {
   try {
-    const session = await auth.api.getSession({
-      headers: req.headers,
-    });
-
-    if (!session?.user) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ message: "Unauthorized" });
     }
-
-    req.user = session.user;
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.BETTER_AUTH_SECRET);
+    req.user = decoded;
     next();
   } catch {
     return res.status(401).json({ message: "Invalid token" });
@@ -35,19 +31,16 @@ export const verifyToken = async (req, res, next) => {
 
 export const verifyAdmin = async (req, res, next) => {
   try {
-    const session = await auth.api.getSession({
-      headers: req.headers,
-    });
-
-    if (!session?.user) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ message: "Unauthorized" });
     }
-
-    if (session.user.role !== "admin") {
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.BETTER_AUTH_SECRET);
+    if (decoded.role !== "admin") {
       return res.status(403).json({ message: "Admin access required" });
     }
-
-    req.user = session.user;
+    req.user = decoded;
     next();
   } catch {
     return res.status(403).json({ message: "Forbidden" });

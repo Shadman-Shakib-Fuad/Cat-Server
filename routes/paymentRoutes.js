@@ -4,10 +4,10 @@ import User from "../models/User.js";
 import { verifyToken } from "../middleware/verifyToken.js";
 
 const router = express.Router();
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 router.post("/create-checkout-session", verifyToken, async (req, res) => {
   try {
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: [
@@ -32,22 +32,23 @@ router.post("/create-checkout-session", verifyToken, async (req, res) => {
 });
 
 router.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
-  const sig = req.headers["stripe-signature"];
-  let event;
-
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    const sig = req.headers["stripe-signature"];
+    const event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object;
+      const email = session.metadata.userEmail;
+      await User.findOneAndUpdate({ email }, { isPremium: true });
+    }
+    res.json({ received: true });
   } catch (err) {
-    return res.status(400).json({ message: `Webhook error: ${err.message}` });
+    res.status(400).json({ message: `Webhook error: ${err.message}` });
   }
-
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object;
-    const email = session.metadata.userEmail;
-    await User.findOneAndUpdate({ email }, { isPremium: true });
-  }
-
-  res.json({ received: true });
 });
 
 export default router;
