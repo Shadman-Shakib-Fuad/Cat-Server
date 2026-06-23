@@ -12,7 +12,7 @@ router.post("/create-checkout-session", verifyToken, async (req, res) => {
       payment_method_types: ["card"],
       line_items: [
         {
-          price: "price_1TlKbgFRkqia8IAh7DpsGenB",
+          price: "price_1TlKm5FRkqia8IAhiV5GBaU7",
           quantity: 1,
         },
       ],
