@@ -12,16 +12,12 @@ router.post("/create-checkout-session", verifyToken, async (req, res) => {
       payment_method_types: ["card"],
       line_items: [
         {
-          price_data: {
-            currency: "bdt",
-            product_data: { name: "Digital Life Lessons — Premium (Lifetime)" },
-            unit_amount: 150000,
-          },
+          price: "price_1TlKbgFRkqia8IAh7DpsGenB",
           quantity: 1,
         },
       ],
       mode: "payment",
-      success_url: `${process.env.CLIENT_URL}/payment/success`,
+      success_url: `${process.env.CLIENT_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.CLIENT_URL}/payment/cancel`,
       metadata: { userEmail: req.user.email },
     });
@@ -31,23 +27,20 @@ router.post("/create-checkout-session", verifyToken, async (req, res) => {
   }
 });
 
-router.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+router.get("/verify-session", verifyToken, async (req, res) => {
   try {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-    const sig = req.headers["stripe-signature"];
-    const event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
-    if (event.type === "checkout.session.completed") {
-      const session = event.data.object;
+    const session = await stripe.checkout.sessions.retrieve(req.query.session_id);
+
+    if (session.payment_status === "paid") {
       const email = session.metadata.userEmail;
       await User.findOneAndUpdate({ email }, { isPremium: true });
+      return res.json({ success: true });
     }
-    res.json({ received: true });
+
+    res.json({ success: false });
   } catch (err) {
-    res.status(400).json({ message: `Webhook error: ${err.message}` });
+    res.status(500).json({ message: err.message });
   }
 });
 
