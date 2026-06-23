@@ -1,19 +1,19 @@
 import express from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { OAuth2Client } from "google-auth-library";
 import User from "../models/User.js";
 
 const router = express.Router();
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 router.post("/register", async (req, res) => {
   try {
     const { name, email, password, photoURL } = req.body;
-
     const existing = await User.findOne({ email });
     if (existing) {
       return res.status(400).json({ message: "Email already in use" });
     }
-
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await User.create({
       name,
@@ -21,13 +21,11 @@ router.post("/register", async (req, res) => {
       password: hashedPassword,
       photoURL: photoURL || "",
     });
-
     const token = jwt.sign(
       { id: user._id, email: user.email, name: user.name, role: user.role, isPremium: user.isPremium },
       process.env.BETTER_AUTH_SECRET,
       { expiresIn: "7d" }
     );
-
     res.status(201).json({
       token,
       user: { id: user._id, name: user.name, email: user.email, photoURL: user.photoURL, role: user.role, isPremium: user.isPremium },
@@ -40,15 +38,46 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({ message: "Invalid email or password" });
     }
-
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ message: "Invalid email or password" });
+    }
+    const token = jwt.sign(
+      { id: user._id, email: user.email, name: user.name, role: user.role, isPremium: user.isPremium },
+      process.env.BETTER_AUTH_SECRET,
+      { expiresIn: "7d" }
+    );
+    res.json({
+      token,
+      user: { id: user._id, name: user.name, email: user.email, photoURL: user.photoURL, role: user.role, isPremium: user.isPremium },
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.post("/google", async (req, res) => {
+  try {
+    const { credential } = req.body;
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    const { name, email, picture } = payload;
+
+    let user = await User.findOne({ email });
+    if (!user) {
+      user = await User.create({
+        name,
+        email,
+        photoURL: picture,
+        password: "",
+      });
     }
 
     const token = jwt.sign(
