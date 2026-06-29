@@ -1,9 +1,11 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+dotenv.config();
+
 import { toNodeHandler } from "better-auth/node";
 import connectDB from "./lib/db.js";
-import { auth } from "./lib/auth.js";
+import { getAuth } from "./lib/auth.js";
 
 import userRoutes from "./routes/userRoutes.js";
 import lessonRoutes from "./routes/lessonRoutes.js";
@@ -12,7 +14,6 @@ import commentRoutes from "./routes/commentRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 
-dotenv.config();
 connectDB();
 
 const app = express();
@@ -29,7 +30,7 @@ app.use(
 app.use("/api/payment/webhook", express.raw({ type: "application/json" }));
 app.use(express.json());
 
-app.all("/api/auth/*splat", toNodeHandler(auth));
+app.all("/api/auth/*splat", (req, res) => toNodeHandler(getAuth())(req, res));
 
 app.get("/", (req, res) => res.json({ message: "Digital Life Lessons API running" }));
 
