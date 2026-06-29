@@ -1,32 +1,37 @@
-import jwt from "jsonwebtoken";
+import { auth } from "../lib/auth.js";
 
-export const verifyToken = (req, res, next) => {
+export const verifyToken = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    const session = await auth.api.getSession({
+      headers: new Headers(req.headers),
+    });
+
+    if (!session?.user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
-    const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, process.env.BETTER_AUTH_SECRET);
-    req.user = decoded;
+
+    req.user = session.user;
     next();
   } catch {
     return res.status(401).json({ message: "Invalid token" });
   }
 };
 
-export const verifyAdmin = (req, res, next) => {
+export const verifyAdmin = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    const session = await auth.api.getSession({
+      headers: new Headers(req.headers),
+    });
+
+    if (!session?.user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
-    const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, process.env.BETTER_AUTH_SECRET);
-    if (decoded.role !== "admin") {
+
+    if (session.user.role !== "admin") {
       return res.status(403).json({ message: "Admin access required" });
     }
-    req.user = decoded;
+
+    req.user = session.user;
     next();
   } catch {
     return res.status(403).json({ message: "Forbidden" });
