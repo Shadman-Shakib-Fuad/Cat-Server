@@ -4,12 +4,12 @@ import { verifyToken, verifyAdmin } from "../middleware/verifyToken.js";
 
 const router = express.Router();
 
-router.post("/", async (req, res) => {
+router.post("/sync", async (req, res) => {
   try {
     const { name, email, photoURL } = req.body;
     const existing = await User.findOne({ email });
     if (existing) return res.status(200).json(existing);
-    const user = await User.create({ name, email, photoURL });
+    const user = await User.create({ name, email, photoURL: photoURL || "" });
     res.status(201).json(user);
   } catch (err) {
     res.status(500).json({ message: err.message });
